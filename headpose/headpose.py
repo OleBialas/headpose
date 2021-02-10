@@ -4,6 +4,10 @@ import tensorflow as tf
 from tensorflow import keras
 import logging
 from headpose import DIR
+try:
+    from matplotlib import pyplot as plt
+except ImportError:
+    plt = False
 
 
 class PoseEstimator:
@@ -179,3 +183,22 @@ class PoseEstimator:
         marks = np.array(predictions['output']).flatten()[:136]
         marks = np.reshape(marks, (-1, 2))
         return marks
+
+    def plot_face_detection_marks(self, image, axis=None, show=True):
+        if plt is False:
+            raise ImportError("Plotting requires matplotlib!")
+        if axis is None:
+            fig, axis = plt.subplots()
+        face_boxes = self.extract_cnn_facebox(image)
+        face_box = face_boxes[0]
+        face_img = image[face_box[1]: face_box[3], face_box[0]: face_box[2]]
+        face_img = cv2.resize(face_img, (128, 128))
+        face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
+        marks = self.detect_marks([face_img])
+        marks *= (face_box[2] - face_box[0])
+        marks[:, 0] += face_box[0]
+        marks[:, 1] += face_box[1]
+        axis.imshow(image, cmap="gray")
+        axis.scatter(marks[:, 0], marks[:, 1], color="red", marker=".")
+        if show:
+            plt.show()
