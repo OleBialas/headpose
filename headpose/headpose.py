@@ -3,21 +3,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 import logging
-
-MODELPOINTS = np.float32([[6.825897, 6.760612, 4.402142],
-                          [1.330353, 7.122144, 6.903745],
-                          [-1.330353, 7.122144, 6.903745],
-                          [-6.825897, 6.760612, 4.402142],
-                          [5.311432, 5.485328, 3.987654],
-                          [1.789930, 5.393625, 4.413414],
-                          [-1.789930, 5.393625, 4.413414],
-                          [-5.311432, 5.485328, 3.987654],
-                          [2.005628, 1.409845, 6.165652],
-                          [-2.005628, 1.409845, 6.165652],
-                          [2.774015, -2.080775, 5.048531],
-                          [-2.774015, -2.080775, 5.048531],
-                          [0.000000, -3.116408, 6.097667],
-                          [0.000000, -7.415691, 4.070434]])
+from headpose import DIR
 
 
 class PoseEstimator:
@@ -33,6 +19,10 @@ class PoseEstimator:
                 keras.models.load_model(DIR/'data'/"models"/"pose_model")
         except OSError:
             logging.warning("could not find the trained headpose model...")
+        try:
+            self.model_points = np.loadtxt(DIR/"model"/"model_points.txt")
+        except OSError:
+            raise FileNotFoundError("Could not find model_points.txt!")
         self.threshold = threshold
         self.detection_result = None
         self.cnn_input_size = 128
@@ -69,7 +59,7 @@ class PoseEstimator:
                                     shape[57], shape[8]])
             dist_coeffs = np.zeros((4, 1))  # Assuming no lens distortion
             (success, rotation_vec, translation_vec) = \
-                cv2.solvePnP(MODELPOINTS, image_pts, camera_matrix,
+                cv2.solvePnP(self.model_points, image_pts, camera_matrix,
                              dist_coeffs)
 
             rotation_mat, _ = cv2.Rodrigues(rotation_vec)
