@@ -16,7 +16,7 @@ class PoseEstimator:
             logging.warning("could not initialize DNN!")
         try:  # Restore model from the saved_model file.
             self.model = \
-                keras.models.load_model(DIR/'data'/"models"/"pose_model")
+                keras.models.load_model(DIR/"model"/"pose_model")
         except OSError:
             logging.warning("could not find the trained headpose model...")
         try:
@@ -67,7 +67,7 @@ class PoseEstimator:
             _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(pose_mat)
             angles[0, 0] = angles[0, 0] * -1
 
-            return angles[1, 0], angles[0, 0]  # azimuth, elevation
+            return angles[1, 0], angles[0, 0], angles[2, 0]  # roll, pitch, yaw
 
     def get_faceboxes(self, image):
         """
