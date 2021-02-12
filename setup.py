@@ -11,7 +11,7 @@ with open('headpose/__init__.py') as file:
         if m:
             version = m.group(1)
 
-setup(name='HeadPose',
+setup(name='headpose',
       version=version,
       description='estimate the pose of the head based on an image.',
       long_description=readme,
