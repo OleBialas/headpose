@@ -25,7 +25,8 @@ setup(name='headpose',
                         'opencv-python',
                         'numpy'],
       packages=find_packages(),
-      package_data={'headpose': ['model/*']},
+      package_data={'headpose': ['model/*',
+                                 'model/pose_model/*']},
       include_package_data=True,
       zip_safe=False)
 
