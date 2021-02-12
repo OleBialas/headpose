@@ -28,6 +28,7 @@ setup(name='headpose',
       package_data={'headpose': ['model/caffemodel',
                                  'model/model_points.txt',
                                  'model/pose_model/saved_model.pb',
+                                 'model/pose_model/variables/*'
                                  'model/pose_model/variables/variables.data-00000-of-00001',
                                  'model/pose_model/variables/variables.index']},
       include_package_data=True,
