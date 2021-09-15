@@ -1,9 +1,6 @@
 import cv2
 import numpy as np
-import tensorflow as tf
-from tensorflow import keras
 import logging
-from headpose import DIR
 try:
     from matplotlib import pyplot as plt
 except ImportError:

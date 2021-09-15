@@ -85,7 +85,6 @@ class FaceLandmarksDataset(Dataset):
 
     def __init__(self, file, transform=None):
         # TODO: include the option to download the dataset
-
         self.root_dir = Path(file).parent
         tree = ET.parse(file)
         root = tree.getroot()

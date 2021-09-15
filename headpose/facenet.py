@@ -1,37 +1,19 @@
-import sys
-import time
-import cv2
-import os
-import random
 from pathlib import Path
-import numpy as np
-import matplotlib.pyplot as plt
-from PIL import Image
-import imutils
-import matplotlib.image as mpimg
-from collections import OrderedDict
-# from skimage import io, transform
-from math import *
-import xml.etree.ElementTree as ET
-
+import time
 import torch
-import torchvision
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
-import torchvision.transforms.functional as TF
-from torchvision import datasets, models, transforms
+from torchvision import models
 from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
-from headpose.dataset import FaceLandmarksDataset, Transforms
+from dataset import FaceLandmarksDataset, Transforms
 
 
-class Network(nn.Module):
+class ResNet(nn.Module):
     def __init__(self, num_classes=136):
         super().__init__()
         self.model_name = 'resnet18'
         self.model = models.resnet18()
-        # set input channel to one so the network accepts graycale images
+        # set input channel to one so the network accepts grayscale images
         self.model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
         # number of output features --> x,y coordinates of the landmarks
         self.model.fc = nn.Linear(self.model.fc.in_features, num_classes)
@@ -41,110 +23,78 @@ class Network(nn.Module):
         return x
 
 
-def print_overwrite(step, total_step, loss, operation):
-    sys.stdout.write('\r')
-    if operation == 'train':
-        sys.stdout.write("Train Steps: %d/%d  Loss: %.4f " % (step, total_step, loss))
-    else:
-        sys.stdout.write("Valid Steps: %d/%d  Loss: %.4f " % (step, total_step, loss))
-
-    sys.stdout.flush()
-
-
-def train(network, learning_rate=0.0001):
+def train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8, learning_rate=0.0001):
     if not isinstance(network, nn.Module) and hasattr(network, "forward"):
         raise ValueError("Network must be a torch module with a `forward method")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if device.type == "cpu":
-        raise Warning("Training the network without GPU support will take a very long time!")
     network.to(device)
+    network.train()  # set network to "training mode"
 
-    # criterion = nn.MSELoss()
+    len_valid_set = int(val_size * len(dataset))
+    len_train_set = len(dataset) - len_valid_set
+    print("The length of Train set is {}".format(len_train_set))
+    print("The length of Valid set is {}".format(len_valid_set))
+    train_dataset, valid_dataset, = torch.utils.data.random_split(dataset, [len_train_set, len_valid_set])
+    # shuffle and batch the datasets
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_train, shuffle=True, num_workers=4)
+    valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=batch_val, shuffle=True, num_workers=4)
+
+    criterion = nn.MSELoss()
     optimizer = optim.Adam(network.parameters(), lr=learning_rate)
-
-    loss_min = np.inf
-    num_epochs = 10
 
     start_time = time.time()
     for epoch in range(1, num_epochs + 1):
 
-        loss_train = 0
-        loss_valid = 0
-        running_loss = 0
+        loss_train, loss_valid, running_loss = 0, 0, 0
 
-        network.train()
         for step in range(1, len(train_loader) + 1):
             images, landmarks = next(iter(train_loader))
-
-            images = images.cuda()
-            landmarks = landmarks.view(landmarks.size(0), -1).cuda()
+            images = images.to(device)
+            landmarks = landmarks.view(landmarks.size(0), -1).to(device)
 
             predictions = network(images)
 
-            # clear all the gradients before calculating them
-            optimizer.zero_grad()
+            optimizer.zero_grad()  # clear all the gradients before calculating them
+            loss_train_step = criterion(predictions, landmarks)  # find the loss for the current step
+            loss_train_step.backward()  # calculate the gradients
+            optimizer.step()  # update the parameters
 
-            # find the loss for the current step
-            loss_train_step = criterion(predictions, landmarks)
-
-            # calculate the gradients
-            loss_train_step.backward()
-
-            # update the parameters
-            optimizer.step()
-
+            # calculate loss and print running loss
             loss_train += loss_train_step.item()
             running_loss = loss_train / step
+            print(f"training steps {step} of {len(train_loader)}. Loss: {running_loss:.5f}")
 
-            print_overwrite(step, len(train_loader), running_loss, 'train')
-
-        network.eval()
+        network.eval()  # set the network to evaluation mode
         with torch.no_grad():
 
             for step in range(1, len(valid_loader) + 1):
                 images, landmarks = next(iter(valid_loader))
 
                 images = images.cuda()
-                landmarks = landmarks.view(landmarks.size(0), -1).cuda()
+                landmarks = landmarks.view(landmarks.size(0), -1).to(device)
 
                 predictions = network(images)
 
-                # find the loss for the current step
-                loss_valid_step = criterion(predictions, landmarks)
+                loss_valid_step = criterion(predictions, landmarks)  # find the loss for the current step
 
                 loss_valid += loss_valid_step.item()
                 running_loss = loss_valid / step
+                print(f"step {step} of {len(train_loader)}. Loss: {running_loss:.5f}")
 
-                print_overwrite(step, len(valid_loader), running_loss, 'valid')
-
+        # divide by batch number to get the loss for the whole epoch
         loss_train /= len(train_loader)
         loss_valid /= len(valid_loader)
-
-        print('\n--------------------------------------------------')
-        print('Epoch: {}  Train Loss: {:.4f}  Valid Loss: {:.4f}'.format(epoch, loss_train, loss_valid))
-        print('--------------------------------------------------')
-
-        if loss_valid < loss_min:
-            loss_min = loss_valid
-            torch.save(network.state_dict(), '/content/face_landmarks.pth')
-            print("\nMinimum Validation Loss of {:.4f} at epoch {}/{}".format(loss_min, epoch, num_epochs))
-            print('Model Saved\n')
+        print(f'Epoch: {epoch}  Train Loss: {loss_train:.4f}  Valid Loss: {loss_valid:.4f}')
 
     print('Training Complete')
     print("Total Elapsed Time : {} s".format(time.time() - start_time))
 
 
 if __name__ == "__main__":
-    dataset = FaceLandmarksDataset(Transforms())
-    # split the dataset into validation and test sets
-    len_valid_set = int(0.1 * len(dataset))
-    len_train_set = len(dataset) - len_valid_set
-
-    print("The length of Train set is {}".format(len_train_set))
-    print("The length of Valid set is {}".format(len_valid_set))
-
-    train_dataset, valid_dataset, = torch.utils.data.random_split(dataset, [len_train_set, len_valid_set])
-
-    # shuffle and batch the datasets
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=4)
-    valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=8, shuffle=True, num_workers=4)
+    path = Path(__file__).parent.parent.resolve()
+    print(path)
+    dataset = FaceLandmarksDataset(file=path/"data/ibug_300W_large_face_landmark_dataset/labels_ibug_300W_train.xml",
+                                   transform=Transforms())
+    network = ResNet()
+    num_epochs = 1
+    train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8, learning_rate=0.0001)
