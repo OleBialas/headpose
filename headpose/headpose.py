@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Sep 17 14:42:04 2021
+
+@author: paulfriedrich
+"""
+
 import cv2
 import numpy as np
 import tensorflow as tf
@@ -32,13 +40,40 @@ class PoseEstimator:
         self.cnn_input_size = 128
         self.marks = None
 
+    def pose_from_image_aruco(self, image):        
+        arucoDict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_5X5_100)
+        #create parameter file
+        params = cv2.aruco.DetectorParameters_create()
+        params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX #set parameters 
+        (corners, ids, rejected) = cv2.aruco.detectMarkers(image,        # detect markers
+            arucoDict, parameters=params)
+
+        camera_matrix = np.array([[927.79941685, 0, 529.33143081],
+                                  [0, 927.79941685, 377.95266194,
+                                  [0, 0, 1]], dtype="double")
+        if len(corners) > 1:
+            logging.warning("There is more than one marker in the image!")
+            return None, None
+        elif len(corners) == 0:
+            logging.warning("No marker detected!")
+        else:
+            dist_coeffs = np.zeros((4, 1))  # Assuming no lens distortion
+            rotation_vec, translation_vec, _objPoints = \
+                cv2.aruco.estimatePoseSingleMarkers(corners, .05, camera_matrix, dist_coeffs)
+            rotation_mat, _ = cv2.Rodrigues(rotation_vec)
+            pose_mat = cv2.hconcat((rotation_mat, translation_vec.T))
+            _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(pose_mat)
+            angles[0, 0] = angles[0, 0] * -1
+            
+        return angles[1, 0], angles[0, 0], angles[2, 0]  # roll, pitch, yaw
+
     def pose_from_image(self, image):
         size = image.shape
         focal_length = size[1]
         center = (size[1]/2, size[0]/2)
         camera_matrix = np.array([[focal_length, 0, center[0]],
-                                 [0, focal_length, center[1]],
-                                 [0, 0, 1]], dtype="double")
+                                  [0, focal_length, center[1]],
+                                  [0, 0, 1]], dtype="double")
 
         faceboxes = self.extract_cnn_facebox(image)
         if len(faceboxes) > 1:
@@ -64,7 +99,7 @@ class PoseEstimator:
             dist_coeffs = np.zeros((4, 1))  # Assuming no lens distortion
             (success, rotation_vec, translation_vec) = \
                 cv2.solvePnP(self.model_points, image_pts, camera_matrix,
-                             dist_coeffs)
+                              dist_coeffs)
 
             rotation_mat, _ = cv2.Rodrigues(rotation_vec)
             pose_mat = cv2.hconcat((rotation_mat, translation_vec))
