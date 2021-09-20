@@ -47,9 +47,8 @@ class PoseEstimator:
         params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX #set parameters 
         (corners, ids, rejected) = cv2.aruco.detectMarkers(image,        # detect markers
             arucoDict, parameters=params)
-
-        camera_matrix = np.array([[927.79941685, 0, 529.33143081],
-                                  [0, 927.79941685, 377.95266194,
+        camera_matrix = np.array([[focal_length, 0, center[0]],
+                                  [0, focal_length, center[1]],
                                   [0, 0, 1]], dtype="double")
         if len(corners) > 1:
             logging.warning("There is more than one marker in the image!")
