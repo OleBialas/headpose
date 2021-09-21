@@ -47,6 +47,9 @@ class PoseEstimator:
         params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX #set parameters 
         (corners, ids, rejected) = cv2.aruco.detectMarkers(image,        # detect markers
             arucoDict, parameters=params)
+        size = image.shape
+        focal_length = size[1]
+        center = (size[1]/2, size[0]/2)
         camera_matrix = np.array([[focal_length, 0, center[0]],
                                   [0, focal_length, center[1]],
                                   [0, 0, 1]], dtype="double")
