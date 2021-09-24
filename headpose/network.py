@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import models
 from torch.utils.data import Dataset
-from dataset import FaceLandmarksDataset, Transforms
+from headpose.dataset import FaceLandmarksDataset, Transforms, get_dlib_faces
 
 
 class ResNet(nn.Module):
@@ -70,7 +70,7 @@ def train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8
             for step in range(1, len(valid_loader) + 1):
                 images, landmarks = next(iter(valid_loader))
 
-                images = images.cuda()
+                images = images.to(device)
                 landmarks = landmarks.view(landmarks.size(0), -1).to(device)
 
                 predictions = network(images)
@@ -91,10 +91,8 @@ def train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8
 
 
 if __name__ == "__main__":
-    path = Path(__file__).parent.parent.resolve()
-    print(path)
-    dataset = FaceLandmarksDataset(file=path/"data/ibug_300W_large_face_landmark_dataset/labels_ibug_300W_train.xml",
-                                   transform=Transforms())
+    xml_file = get_dlib_faces()+"/labels_ibug_300W_train.xml"
+    dataset = FaceLandmarksDataset(file=xml_file, transform=Transforms())
     network = ResNet()
     num_epochs = 1
     train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8, learning_rate=0.0001)

@@ -1,27 +1,16 @@
-import time
 import cv2
-import os
 import random
 from pathlib import Path
 import numpy as np
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 from PIL import Image
 import imutils
-import matplotlib.image as mpimg
-from collections import OrderedDict
-# from skimage import io, transform
 from math import *
 import xml.etree.ElementTree as ET
-
 import torch
-import torchvision
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
 import torchvision.transforms.functional as TF
-from torchvision import datasets, models, transforms
+from torchvision import transforms
 from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
 
 
 class Transforms:
@@ -84,7 +73,6 @@ class Transforms:
 class FaceLandmarksDataset(Dataset):
 
     def __init__(self, file, transform=None):
-        # TODO: include the option to download the dataset
         self.root_dir = Path(file).parent
         tree = ET.parse(file)
         root = tree.getroot()
@@ -94,7 +82,7 @@ class FaceLandmarksDataset(Dataset):
         self.transform = transform
 
         for filename in root[2]:
-            self.image_filenames.append(os.path.join(self.root_dir, filename.attrib['file']))
+            self.image_filenames.append(self.root_dir/filename.attrib['file'])
 
             self.crops.append(filename[0].attrib)
 
@@ -121,3 +109,31 @@ class FaceLandmarksDataset(Dataset):
         landmarks = landmarks - 0.5  # zero center the landmarks
 
         return image, landmarks
+
+    def plot_sample(self):
+
+
+
+def get_dlib_faces(path=None):
+    """
+    Return the path to the folder containing dlib's facial landmark dataset and download it if necessary.
+    Arguments:
+        path (None | str): path to look for the dataset or download it to. If None this defauls to 'home/dlib_data'
+    Returns:
+        (str): absolute path to the folder containg the face landmark dataset.
+    """
+    import urllib.request
+    import tarfile
+    if path is None:
+        path = Path.home()/"dlib_data"
+    elif not Path(path).exists():
+        raise ValueError("The specified path does not exist!")
+    if not path.exists():
+        path.mkdir()
+    if not (path/"ibug_300W_large_face_landmark_dataset").exists():
+        print(f"downloading the data to {path}. This may take a while ...")
+        tar = "http://dlib.net/files/data/ibug_300W_large_face_landmark_dataset.tar.gz"
+        stream = urllib.request.urlopen(tar)
+        tar = tarfile.open(fileobj=stream, mode="r|gz")
+        tar.extractall(path=path)
+    return str(path/"ibug_300W_large_face_landmark_dataset")
