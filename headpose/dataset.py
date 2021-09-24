@@ -3,6 +3,7 @@ import random
 from pathlib import Path
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.patches import Rectangle
 from PIL import Image
 import imutils
 from math import *
@@ -110,8 +111,20 @@ class FaceLandmarksDataset(Dataset):
 
         return image, landmarks
 
-    def plot_sample(self):
-
+    def sample(self, plot=True):
+        index = np.random.randint(0, len(self.image_filenames), 1)[0]
+        image = Image.open(self.image_filenames[index])
+        landmarks = self.landmarks[index]
+        crop = self.crops[index]
+        if plot:
+            plt.imshow(image)
+            plt.scatter(landmarks[:, 0], landmarks[:, 1], marker=".")
+            width, height = int(crop["width"]), int(crop["height"])
+            x, y = int(crop["left"]), int(crop["top"])
+            plt.gca().add_patch(Rectangle((x, y), width, height, linewidth=1, edgecolor='r', facecolor='none'))            plt.axis("off")
+            plt.show()
+        else:
+            return image, landmarks
 
 
 def get_dlib_faces(path=None):
