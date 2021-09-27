@@ -8,26 +8,14 @@ except ImportError:
 
 
 class PoseEstimator:
-    def __init__(self, threshold=.9):
-        try:
-            self.face_net = cv2.dnn.readNetFromCaffe(
-                str(DIR/"model"/"prototxt"),
-                str(DIR/"model"/"caffemodel"))
-        except cv2.error:
-            logging.warning("could not initialize DNN!")
-        try:  # Restore model from the saved_model file.
-            self.model = \
-                keras.models.load_model(DIR/"model"/"pose_model")
-        except OSError:
-            logging.warning("could not find the trained headpose model...")
-        try:
-            self.model_points = np.loadtxt(DIR/"model"/"model_points.txt")
-        except OSError:
-            raise FileNotFoundError("Could not find model_points.txt!")
-        self.threshold = threshold
-        self.detection_result = None
-        self.cnn_input_size = 128
-        self.marks = None
+    def __init__(self, method):
+        if method == "landmarks":
+            pass
+        elif method == "aruco":
+            pass
+        else:
+            raise ValueError("Possible methods are 'landmarks' or 'aruco'!")
+
 
     def pose_from_image(self, image):
         size = image.shape
