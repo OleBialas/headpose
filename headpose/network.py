@@ -2,7 +2,7 @@ from pathlib import Path
 import time
 import torch
 import torch.nn as nn
-import torch.optim as optim
+from torch import optim
 from torchvision import models
 from torch.utils.data import Dataset
 from headpose.dataset import FaceLandmarksDataset, Transforms, get_dlib_faces
@@ -15,7 +15,7 @@ class ResNet(nn.Module):
         self.model = models.resnet18()
         # set input channel to one so the network accepts grayscale images
         self.model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        # number of output features --> x,y coordinates of the landmarks
+        # number of output features --> x,y coordinates of the 68 landmarks
         self.model.fc = nn.Linear(self.model.fc.in_features, num_classes)
 
     def forward(self, x):
@@ -23,7 +23,7 @@ class ResNet(nn.Module):
         return x
 
 
-def train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8, learning_rate=0.0001):
+def train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8, learning_rate=0.0001, save=True):
     if not isinstance(network, nn.Module) and hasattr(network, "forward"):
         raise ValueError("Network must be a torch module with a `forward method")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -88,6 +88,11 @@ def train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8
 
     print('Training Complete')
     print("Total Elapsed Time : {} s".format(time.time() - start_time))
+
+    if save:
+        write_path = Path(__file__).parent/"model_weights.zip"
+        torch.save(network.state_dict(), write_path)
+        print(f"Saved the trained model to {write_path}")
 
 
 if __name__ == "__main__":
