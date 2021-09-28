@@ -55,9 +55,10 @@ class PoseEstimator:
                                   [0, 0, 1]], dtype="double")
         if len(corners) > 1:
             logging.warning("There is more than one marker in the image!")
-            return None, None
+            return None, None, None
         elif len(corners) == 0:
             logging.warning("No marker detected!")
+            return None, None, None
         else:
             dist_coeffs = np.zeros((4, 1))  # Assuming no lens distortion
             rotation_vec, translation_vec, _objPoints = \
