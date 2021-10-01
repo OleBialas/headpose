@@ -1,21 +1,44 @@
+from pathlib import Path
 import cv2
 import numpy as np
 import logging
-try:
-    from matplotlib import pyplot as plt
-except ImportError:
-    plt = False
+from matplotlib import pyplot as plt
+from PIL import Image
+import torch
+import torchvision.transforms.functional as TF
+from headpose.network import ResNet
+root = Path(__file__).parent
+face_cascade = cv2.CascadeClassifier(str(root/"haarcascade_frontalface_default.xml"))
 
 
 class PoseEstimator:
     def __init__(self, method):
         if method == "landmarks":
-            pass
+            self.model = ResNet()
+            # TODO: check if the network is present, if not download it from the repo
+            self.model.load_state_dict(torch.load(root/"model_weights.zip"))
         elif method == "aruco":
             pass
         else:
             raise ValueError("Possible methods are 'landmarks' or 'aruco'!")
 
+    def _detect_landmarks(self, image):
+        if image.ndim == 3:  # convert color to grayscale
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        height, width = image.shape
+        faces = face_cascade.detectMultiScale(image, 1.1, 4)
+        if len(faces) != 1:
+            raise ValueError("There must be exactly one face in the image!")
+        all_landmarks = []
+        for (x, y, w, h) in faces:
+            image = image[y:y + h, x:x + w]
+            image = TF.resize(Image.fromarray(image), size=(224, 224))
+            image = TF.to_tensor(image)
+            image = TF.normalize(image, [0.5], [0.5])
+        with torch.no_grad():
+            landmarks = self.model(image.unsqueeze(0))
+        landmarks = (landmarks.view(68, 2).detach().numpy()+0.5) * np.array([w, h]) + np.array([x, y])
+        return landmarks
 
     def pose_from_image(self, image):
         size = image.shape
