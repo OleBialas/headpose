@@ -1,5 +1,6 @@
 from pathlib import Path
 import time
+import numpy as np
 import torch
 import torch.nn as nn
 from torch import optim
@@ -29,7 +30,6 @@ def train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     network.to(device)
     network.train()  # set network to "training mode"
-
     len_valid_set = int(val_size * len(dataset))
     len_train_set = len(dataset) - len_valid_set
     print("The length of Train set is {}".format(len_train_set))
@@ -38,12 +38,12 @@ def train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8
     # shuffle and batch the datasets
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_train, shuffle=True, num_workers=4)
     valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=batch_val, shuffle=True, num_workers=4)
-
     criterion = nn.MSELoss()
     optimizer = optim.Adam(network.parameters(), lr=learning_rate)
 
     start_time = time.time()
-    for epoch in range(1, num_epochs + 1):
+    loss_record = np.zeros(2, num_epochs)
+    for epoch in range(num_epochs):
 
         loss_train, loss_valid, running_loss = 0, 0, 0
 
@@ -84,7 +84,8 @@ def train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8
         # divide by batch number to get the loss for the whole epoch
         loss_train /= len(train_loader)
         loss_valid /= len(valid_loader)
-        print(f'Epoch: {epoch}  Train Loss: {loss_train:.4f}  Valid Loss: {loss_valid:.4f}')
+        loss_record[0, epoch], loss_record[1, epoch] = loss_train, loss_valid
+        print(f'Epoch: {epoch+1}  Train Loss: {loss_train:.4f}  Valid Loss: {loss_valid:.4f}')
 
     print('Training Complete')
     print("Total Elapsed Time : {} s".format(time.time() - start_time))
@@ -92,6 +93,7 @@ def train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8
     if save:
         write_path = Path(__file__).parent/"model_weights.zip"
         torch.save(network.state_dict(), write_path)
+        np.save(str(Path(__file__).parent/"loss_record.npy"), loss_record)
         print(f"Saved the trained model to {write_path}")
 
 
