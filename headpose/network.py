@@ -42,7 +42,7 @@ def train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8
     optimizer = optim.Adam(network.parameters(), lr=learning_rate)
 
     start_time = time.time()
-    loss_record = np.zeros(2, num_epochs)
+    loss_record = np.zeros((2, num_epochs))
     for epoch in range(num_epochs):
 
         loss_train, loss_valid, running_loss = 0, 0, 0
