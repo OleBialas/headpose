@@ -1,91 +1,103 @@
 from pathlib import Path
+import argparse
 import time
 import numpy as np
 import torch
 import torch.nn as nn
 from torch import optim
-from torchvision import models
 from torch.utils.data import Dataset
-from headpose.dataset import FaceLandmarksDataset, Transforms, get_dlib_faces
-from headpose.detect import ResNet
+from dataset import FaceLandmarksDataset, Transforms, get_dlib_faces
+from detect import ResNet
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--epochs", "-n", type=int, default=1, help="Number of training and validation epochs.")
+parser.add_argument("--valsize", "-v", type=float, default=0.1, help="percentage of the data used for validation.")
+parser.add_argument("--dataset", "-d", help="Path to a .xml file containing image filenames and landmark coordinates.")
+parser.add_argument("--weights", "-w", help="Path to .zip file with network weights for initialization.")
+parser.add_argument("--learnrate", "-l", type=float, default=0.0001, help="Networks learning rate.")
+parser.add_argument("--batchsizetrain", "-bt", type=int, default=64, help="Batch size for training")
+parser.add_argument("--batchsizeval", "-bv", type=int, default=8, help="Batch size for validation")
+parser.add_argument("--outfolder", "-o", help="Folder to which weights and loss record are written.")
+args = parser.parse_args()
+
+network = ResNet()  # initialize the network
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # check if cuda is available
+
+if args.dataset is not None:  # use the specified
+    dataset = FaceLandmarksDataset(file=args.dataset, transform=Transforms())
+else:  # use the dlib dataset
+    dataset = FaceLandmarksDataset(file=get_dlib_faces()+"/labels_ibug_300W.xml", transform=Transforms())
+if args.weights is not None:  # load weights
+    network.load_state_dict(torch.load(args.weights, map_location=device))
+if args.outfolder is not None:
+    out_folder = args.outfolder
+else:
+    out_folder = Path(__file__).absolute().parent
 
 
-def train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8, learning_rate=0.0001, save=True):
-    if not isinstance(network, nn.Module) and hasattr(network, "forward"):
-        raise ValueError("Network must be a torch module with a `forward method")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    network.to(device)
-    network.train()  # set network to "training mode"
-    len_valid_set = int(val_size * len(dataset))
-    len_train_set = len(dataset) - len_valid_set
-    print("The length of Train set is {}".format(len_train_set))
-    print("The length of Valid set is {}".format(len_valid_set))
-    train_dataset, valid_dataset, = torch.utils.data.random_split(dataset, [len_train_set, len_valid_set])
-    # shuffle and batch the datasets
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_train, shuffle=True, num_workers=4)
-    valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=batch_val, shuffle=True, num_workers=4)
-    criterion = nn.MSELoss()
-    optimizer = optim.Adam(network.parameters(), lr=learning_rate)
+network.to(device)
+network.train()  # set network to "training mode"
 
-    start_time = time.time()
-    loss_record = np.zeros((2, num_epochs))
-    for epoch in range(num_epochs):
+len_valid_set = int(args.valsize * len(dataset))
+len_train_set = len(dataset) - len_valid_set
+print("The length of Train set is {}".format(len_train_set))
+print("The length of Valid set is {}".format(len_valid_set))
+train_dataset, valid_dataset, = torch.utils.data.random_split(dataset, [len_train_set, len_valid_set])
+# shuffle and batch the datasets
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batchsizetrain, shuffle=True, num_workers=4)
+valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=args.batchsizeval, shuffle=True, num_workers=4)
+criterion = nn.MSELoss()
+optimizer = optim.Adam(network.parameters(), lr=args.learnrate)
 
-        loss_train, loss_valid, running_loss = 0, 0, 0
+start_time = time.time()
+loss_record = np.zeros((2, args.epochs))
+for epoch in range(args.epochs):
 
-        for step in range(1, len(train_loader) + 1):
-            images, landmarks = next(iter(train_loader))
+    loss_train, loss_valid, running_loss = 0, 0, 0
+
+    for step in range(1, len(train_loader) + 1):
+        images, landmarks = next(iter(train_loader))
+        images = images.to(device)
+        landmarks = landmarks.view(landmarks.size(0), -1).to(device)
+
+        predictions = network(images)
+
+        optimizer.zero_grad()  # clear all the gradients before calculating them
+        loss_train_step = criterion(predictions, landmarks)  # find the loss for the current step
+        loss_train_step.backward()  # calculate the gradients
+        optimizer.step()  # update the parameters
+
+        # calculate loss and print running loss
+        loss_train += loss_train_step.item()
+        running_loss = loss_train / step
+        print(f"training steps {step} of {len(train_loader)}. Loss: {running_loss:.5f}")
+
+    network.eval()  # set the network to evaluation mode
+    with torch.no_grad():
+
+        for step in range(1, len(valid_loader) + 1):
+            images, landmarks = next(iter(valid_loader))
+
             images = images.to(device)
             landmarks = landmarks.view(landmarks.size(0), -1).to(device)
 
             predictions = network(images)
 
-            optimizer.zero_grad()  # clear all the gradients before calculating them
-            loss_train_step = criterion(predictions, landmarks)  # find the loss for the current step
-            loss_train_step.backward()  # calculate the gradients
-            optimizer.step()  # update the parameters
+            loss_valid_step = criterion(predictions, landmarks)  # find the loss for the current step
 
-            # calculate loss and print running loss
-            loss_train += loss_train_step.item()
-            running_loss = loss_train / step
-            print(f"training steps {step} of {len(train_loader)}. Loss: {running_loss:.5f}")
+            loss_valid += loss_valid_step.item()
+            running_loss = loss_valid / step
+            print(f"step {step} of {len(train_loader)}. Loss: {running_loss:.5f}")
 
-        network.eval()  # set the network to evaluation mode
-        with torch.no_grad():
-
-            for step in range(1, len(valid_loader) + 1):
-                images, landmarks = next(iter(valid_loader))
-
-                images = images.to(device)
-                landmarks = landmarks.view(landmarks.size(0), -1).to(device)
-
-                predictions = network(images)
-
-                loss_valid_step = criterion(predictions, landmarks)  # find the loss for the current step
-
-                loss_valid += loss_valid_step.item()
-                running_loss = loss_valid / step
-                print(f"step {step} of {len(train_loader)}. Loss: {running_loss:.5f}")
-
-        # divide by batch number to get the loss for the whole epoch
-        loss_train /= len(train_loader)
-        loss_valid /= len(valid_loader)
-        loss_record[0, epoch], loss_record[1, epoch] = loss_train, loss_valid
-        print(f'Epoch: {epoch+1}  Train Loss: {loss_train:.4f}  Valid Loss: {loss_valid:.4f}')
-
-    print('Training Complete')
-    print("Total Elapsed Time : {} s".format(time.time() - start_time))
-
-    if save:
-        write_path = Path(__file__).parent/"model_weights.zip"
-        torch.save(network.state_dict(), write_path)
-        np.save(str(Path(__file__).parent/"loss_record.npy"), loss_record)
-        print(f"Saved the trained model to {write_path}")
+    # divide by batch number to get the loss for the whole epoch
+    loss_train /= len(train_loader)
+    loss_valid /= len(valid_loader)
+    loss_record[0, epoch], loss_record[1, epoch] = loss_train, loss_valid
+    print(f'Epoch: {epoch+1}  Train Loss: {loss_train:.4f}  Valid Loss: {loss_valid:.4f}')
 
 
-if __name__ == "__main__":
-    xml_file = get_dlib_faces()+"/labels_ibug_300W_train.xml"
-    dataset = FaceLandmarksDataset(file=xml_file, transform=Transforms())
-    network = ResNet()
-    num_epochs = 1
-    train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8, learning_rate=0.0001)
+print('Training Complete')
+print("Total Elapsed Time : {} s".format(time.time() - start_time))
+torch.save(network.state_dict(), out_folder/"model_weights.zip")
+np.save(str(out_folder/"loss_record.npy"), loss_record)
+print(f"Saved the trained model to {out_folder}")
