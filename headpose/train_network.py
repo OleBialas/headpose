@@ -7,21 +7,7 @@ from torch import optim
 from torchvision import models
 from torch.utils.data import Dataset
 from headpose.dataset import FaceLandmarksDataset, Transforms, get_dlib_faces
-
-
-class ResNet(nn.Module):
-    def __init__(self, num_classes=136):
-        super().__init__()
-        self.model_name = 'resnet18'
-        self.model = models.resnet18()
-        # set input channel to one so the network accepts grayscale images
-        self.model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        # number of output features --> x,y coordinates of the 68 landmarks
-        self.model.fc = nn.Linear(self.model.fc.in_features, num_classes)
-
-    def forward(self, x):
-        x = self.model(x)
-        return x
+from headpose.detect import ResNet
 
 
 def train(network, dataset, num_epochs, val_size=.1, batch_train=64, batch_val=8, learning_rate=0.0001, save=True):

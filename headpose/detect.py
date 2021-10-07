@@ -4,8 +4,9 @@ import numpy as np
 import logging
 from PIL import Image
 import torch
+import torch.nn as nn
 import torchvision.transforms.functional as TF
-from headpose.network import ResNet
+from torchvision import models
 root = Path(__file__).parent
 face_cascade = cv2.CascadeClassifier(str(root / "haarcascade_frontalface_default.xml"))
 
@@ -94,3 +95,18 @@ class PoseEstimator:
             angles[0, 0] = angles[0, 0] * -1
 
             return angles[1, 0], angles[0, 0], angles[2, 0]  # roll, pitch, yaw
+
+
+class ResNet(nn.Module):
+    def __init__(self, num_classes=136):
+        super().__init__()
+        self.model_name = 'resnet18'
+        self.model = models.resnet18()
+        # set input channel to one so the network accepts grayscale images
+        self.model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        # number of output features --> x,y coordinates of the 68 landmarks
+        self.model.fc = nn.Linear(self.model.fc.in_features, num_classes)
+
+    def forward(self, x):
+        x = self.model(x)
+        return x

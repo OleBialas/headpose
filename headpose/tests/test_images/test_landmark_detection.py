@@ -1,3 +1,3 @@
-from headpose.headpose import PoseEstimator
+from headpose.detect import PoseEstimator
 
 est = PoseEstimator("landmarks")
