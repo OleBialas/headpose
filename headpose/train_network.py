@@ -118,7 +118,7 @@ for epoch in range(args.epochs):
         predictions = (predictions.view(68, 2).detach().cpu().numpy() + 0.5) * np.array([[w, h]]) + np.array([[x, y]])
         ax.imshow(image)
         ax.scatter(predictions[:, 0], predictions[:, 1])
-        fig.save(out_folder/f"image{epoch}.jpg")
+        fig.savefig(out_folder/f"image{epoch}.jpg")
 
 print('Training Complete')
 print("Total Elapsed Time : {} s".format(time.time() - start_time))
