@@ -1,14 +1,18 @@
 from pathlib import Path
 import argparse
 import time
+from matplotlib import pyplot as plt
 import numpy as np
 import cv2
+from PIL import Image
 import torch
 import torch.nn as nn
 from torch import optim
+import torchvision.transforms.functional as TF
 from torch.utils.data import Dataset
 from dataset import FaceLandmarksDataset, Transforms, get_dlib_faces
-from detect import ResNet, PoseEstimator
+from detect import ResNet
+root = Path(__file__).parent
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epochs", "-n", type=int, default=1, help="Number of training and validation epochs.")
@@ -35,9 +39,19 @@ if args.outfolder is not None:
     out_folder = args.outfolder
 else:
     out_folder = Path(__file__).absolute().parent
-if args.plot is True:
-    image = cv2.imread(str(dataset.image_filenames[0]))
-    est = PoseEstimator("landmarks")
+
+if args.plot is True:  # use the first image in the database to visualize the training process
+    face_cascade = cv2.CascadeClassifier(str(root / "haarcascade_frontalface_default.xml"))
+    image = cv2.cvtColor(cv2.imread(str(dataset.image_filenames[0])), cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(image, 1.1, 4)
+    if len(faces) != 1:
+        raise ValueError("There must be exactly one face in the image!")
+    for (x, y, w, h) in faces:
+        image_crop = image[y:y + h, x:x + w]
+        image_crop = TF.resize(Image.fromarray(image_crop), size=[224, 224])
+        image_crop = TF.to_tensor(image_crop)
+        image_crop = TF.normalize(image_crop, [0.5], [0.5])
+
 network.to(device)
 network.train()  # set network to "training mode"
 
@@ -97,9 +111,13 @@ for epoch in range(args.epochs):
     loss_valid /= len(valid_loader)
     loss_record[0, epoch], loss_record[1, epoch] = loss_train, loss_valid
     print(f'Epoch: {epoch+1}  Train Loss: {loss_train:.4f}  Valid Loss: {loss_valid:.4f}')
+
     if args.plot is True:
-        est.model=network
-        fig = est.detect_landmarks(image, True)
+        fig, ax = plt.subplots()
+        predictions = network(image_crop.unsqueeze(0))
+        predictions = (predictions.view(68, 2).detach().numpy() + 0.5) * np.array([[w, h]]) + np.array([[x, y]])
+        ax.imshow(image)
+        ax.scatter(predictions[:, 0], predictions[:, 1])
         fig.save(out_folder/f"image{epoch}.jpg")
 
 print('Training Complete')
