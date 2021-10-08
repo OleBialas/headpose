@@ -115,7 +115,7 @@ for epoch in range(args.epochs):
     if args.plot is True:
         fig, ax = plt.subplots()
         predictions = network(image_crop.unsqueeze(0).to(device))
-        predictions = (predictions.view(68, 2).detach().numpy() + 0.5) * np.array([[w, h]]) + np.array([[x, y]])
+        predictions = (predictions.view(68, 2).detach().cpu().numpy() + 0.5) * np.array([[w, h]]) + np.array([[x, y]])
         ax.imshow(image)
         ax.scatter(predictions[:, 0], predictions[:, 1])
         fig.save(out_folder/f"image{epoch}.jpg")
