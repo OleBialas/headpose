@@ -51,7 +51,6 @@ if args.plot is True:  # use the first image in the database to visualize the tr
         image_crop = TF.resize(Image.fromarray(image_crop), size=[224, 224])
         image_crop = TF.to_tensor(image_crop)
         image_crop = TF.normalize(image_crop, [0.5], [0.5])
-        image_crop.to(device)
 
 network.to(device)
 network.train()  # set network to "training mode"
@@ -115,7 +114,7 @@ for epoch in range(args.epochs):
 
     if args.plot is True:
         fig, ax = plt.subplots()
-        predictions = network(image_crop.unsqueeze(0))
+        predictions = network(image_crop.unsqueeze(0).to(device))
         predictions = (predictions.view(68, 2).detach().numpy() + 0.5) * np.array([[w, h]]) + np.array([[x, y]])
         ax.imshow(image)
         ax.scatter(predictions[:, 0], predictions[:, 1])
