@@ -2,12 +2,13 @@ from pathlib import Path
 import argparse
 import time
 import numpy as np
+import cv2
 import torch
 import torch.nn as nn
 from torch import optim
 from torch.utils.data import Dataset
 from dataset import FaceLandmarksDataset, Transforms, get_dlib_faces
-from detect import ResNet
+from detect import ResNet, PoseEstimator
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epochs", "-n", type=int, default=1, help="Number of training and validation epochs.")
@@ -18,6 +19,7 @@ parser.add_argument("--learnrate", "-l", type=float, default=0.0001, help="Netwo
 parser.add_argument("--batchsizetrain", "-bt", type=int, default=64, help="Batch size for training")
 parser.add_argument("--batchsizeval", "-bv", type=int, default=8, help="Batch size for validation")
 parser.add_argument("--outfolder", "-o", help="Folder to which weights and loss record are written.")
+parser.add_argument("--plot", default=False, type=bool, help="If True, plot detected landmarks after every epoch.")
 args = parser.parse_args()
 
 network = ResNet()  # initialize the network
@@ -26,15 +28,16 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # check i
 if args.dataset is not None:  # use the specified
     dataset = FaceLandmarksDataset(file=args.dataset, transform=Transforms())
 else:  # use the dlib dataset
-    dataset = FaceLandmarksDataset(file=get_dlib_faces()+"/labels_ibug_300W.xml", transform=Transforms())
+    dataset = FaceLandmarksDataset(file=get_dlib_faces()+"/labels_ibug_300W_train.xml", transform=Transforms())
 if args.weights is not None:  # load weights
     network.load_state_dict(torch.load(args.weights, map_location=device))
 if args.outfolder is not None:
     out_folder = args.outfolder
 else:
     out_folder = Path(__file__).absolute().parent
-
-
+if args.plot is True:
+    image = cv2.imread(str(dataset.image_filenames[0]))
+    est = PoseEstimator("landmarks")
 network.to(device)
 network.train()  # set network to "training mode"
 
@@ -94,10 +97,14 @@ for epoch in range(args.epochs):
     loss_valid /= len(valid_loader)
     loss_record[0, epoch], loss_record[1, epoch] = loss_train, loss_valid
     print(f'Epoch: {epoch+1}  Train Loss: {loss_train:.4f}  Valid Loss: {loss_valid:.4f}')
-
+    if args.plot is True:
+        est.model=network
+        fig = est.detect_landmarks(image, True)
+        fig.save(out_folder/f"image{epoch}.jpg")
 
 print('Training Complete')
 print("Total Elapsed Time : {} s".format(time.time() - start_time))
 torch.save(network.state_dict(), out_folder/"model_weights.zip")
 np.save(str(out_folder/"loss_record.npy"), loss_record)
 print(f"Saved the trained model to {out_folder}")
+
