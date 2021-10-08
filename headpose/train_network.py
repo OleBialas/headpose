@@ -51,6 +51,7 @@ if args.plot is True:  # use the first image in the database to visualize the tr
         image_crop = TF.resize(Image.fromarray(image_crop), size=[224, 224])
         image_crop = TF.to_tensor(image_crop)
         image_crop = TF.normalize(image_crop, [0.5], [0.5])
+        image_crop.to(device)
 
 network.to(device)
 network.train()  # set network to "training mode"
