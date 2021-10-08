@@ -36,7 +36,7 @@ else:  # use the dlib dataset
 if args.weights is not None:  # load weights
     network.load_state_dict(torch.load(args.weights, map_location=device))
 if args.outfolder is not None:
-    out_folder = args.outfolder
+    out_folder = Path(args.outfolder)
 else:
     out_folder = Path(__file__).absolute().parent
 
