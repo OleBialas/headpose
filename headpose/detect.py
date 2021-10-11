@@ -29,7 +29,9 @@ class PoseEstimator:
             self.model.load_state_dict(torch.load(root / "model_weights.zip", map_location=device))
             self.model.eval()
         elif method == "aruco":
-            pass
+            self.arucodict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_5X5_100)
+            self.params = cv2.aruco.DetectorParameters_create()
+            self.params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
         else:
             raise ValueError("Possible methods are 'landmarks' or 'aruco'!")
 
@@ -79,12 +81,18 @@ class PoseEstimator:
             image_points = landmarks[[30, 8, 45, 36, 54, 48]]  # pick points corresponding to the model
             success, rotation_vec, translation_vec = \
                 cv2.solvePnP(model_points, image_points, camera_matrix, distance_coefficients)
-            rotation_mat, _ = cv2.Rodrigues(rotation_vec)
-            pose_mat = cv2.hconcat((rotation_mat, translation_vec))
-            _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(pose_mat)
-            angles[0, 0] = angles[0, 0] * -1
+        elif self.method == "aruco":
+            corners, ids, rejected = cv2.aruco.detectMarkers(image, self.arucodict, parameters=self.params)
+            if len(corners) != 1:
+                raise ValueError("There must be exactly one marker in the image")  # TODO: support multiple markers
+            rotation_vec, translation_vec, _objPoints = \
+                cv2.aruco.estimatePoseSingleMarkers(corners, .05, camera_matrix, distance_coefficients)
+        rotation_mat, _ = cv2.Rodrigues(rotation_vec)
+        pose_mat = cv2.hconcat((rotation_mat, translation_vec))
+        _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(pose_mat)
+        angles[0, 0] = angles[0, 0] * -1
 
-            return angles[1, 0], angles[0, 0], angles[2, 0]  # roll, pitch, yaw
+        return angles[1, 0], angles[0, 0], angles[2, 0]  # roll, pitch, yaw
 
 
 class ResNet(nn.Module):
