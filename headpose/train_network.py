@@ -116,8 +116,8 @@ for epoch in range(args.epochs):
         fig, ax = plt.subplots()
         predictions = network(image_crop.unsqueeze(0).to(device))
         predictions = (predictions.view(68, 2).detach().cpu().numpy() + 0.5) * np.array([[w, h]]) + np.array([[x, y]])
-        ax.imshow(image)
-        ax.scatter(predictions[:, 0], predictions[:, 1])
+        ax.imshow(image, cmap="gray")
+        ax.scatter(predictions[:, 0], predictions[:, 1], s=6)
         fig.savefig(out_folder/f"image{epoch}.jpg")
 
 print('Training Complete')
