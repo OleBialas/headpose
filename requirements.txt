@@ -1,8 +1,6 @@
-opencv-python~=4.5.3.56
-numpy~=1.21.2
-matplotlib~=3.4.3
-imutils~=0.5.4
-torch~=1.9.0
-torchvision~=0.10.0
-pillow~=8.3.1
-setuptools~=52.0.0
+opencv-python
+numpy
+matplotlib
+imutils
+pillow
+setuptools
