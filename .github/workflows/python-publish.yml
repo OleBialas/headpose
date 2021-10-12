@@ -18,7 +18,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v1
       with:
-        python-version: latest
+        python-version: '3.x'
     
     - name: build distribution 📦
       run: |
