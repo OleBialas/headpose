@@ -46,8 +46,7 @@ class PoseEstimator:
         """
         if image.ndim == 3:  # convert color to grayscale
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        height, width = image.shape
-        faces = face_cascade.detectMultiScale(image, 1.1, 4)
+        faces = face_cascade.detectMultiScale(image, 1.1, 5)
         if len(faces) != 1:
             raise ValueError("There must be exactly one face in the image!")
         for (x, y, w, h) in faces:
