@@ -1,13 +1,14 @@
 from pathlib import Path
+
 import cv2
 import numpy as np
-from matplotlib import pyplot as plt
-import logging
-from PIL import Image
 import torch
 import torch.nn as nn
 import torchvision.transforms.functional as TF
+from PIL import Image
+from matplotlib import pyplot as plt
 from torchvision import models
+
 root = Path(__file__).parent
 face_cascade = cv2.CascadeClassifier(str(root / "haarcascade_frontalface_default.xml"))
 
@@ -26,7 +27,14 @@ class PoseEstimator:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             self.model = ResNet()
             # TODO: check if the network is present, if not download it from the repo
-            self.model.load_state_dict(torch.load(root / "model_weights.zip", map_location=device))
+            try:
+                self.model.load_state_dict(torch.load(root / "model_weights.zip", map_location=device))
+            except FileNotFoundError:
+                import requests, zipfile, io
+                print("No model weights found, downloading from the repo ...")
+                r = requests.get("https://raw.githubusercontent.com/OleBialas/headpose/main/headpose/model_weights.zip")
+                z = zipfile.ZipFile(io.BytesIO(r.content))
+                z.extractall(root / "model_weights.zip")
             self.model.eval()
         elif method == "aruco":
             self.arucodict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_5X5_100)
@@ -92,7 +100,8 @@ class PoseEstimator:
         angles[0, 0] = angles[0, 0] * -1
 
         if return_matrices:
-            camera_matrix, distortion_coefficients, rotation_vec, translation_vec
+            return angles[1, 0], angles[0, 0], angles[2, 0], \
+                   camera_matrix, distortion_coefficients, rotation_vec, translation_vec
         else:
             return angles[1, 0], angles[0, 0], angles[2, 0]  # azimuth, elevation, tilt
 
