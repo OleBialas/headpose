@@ -66,7 +66,7 @@ class PoseEstimator:
         else:
             return landmarks
 
-    def pose_from_image(self, image):
+    def pose_from_image(self, image, return_matrices=False):
         # approximate camera coefficients # TODO: add option to calibrate
         size = image.shape
         focal_length = size[1]
@@ -74,24 +74,27 @@ class PoseEstimator:
         camera_matrix = np.array([[focal_length, 0, center[0]],
                                   [0, focal_length, center[1]],
                                   [0, 0, 1]], dtype="double")
-        distance_coefficients = np.zeros((4, 1))  # Assuming no lens distortion
+        distortion_coefficients = np.zeros((4, 1))  # Assuming no lens distortion
         if self.method == "landmarks":
             landmarks = self.detect_landmarks(image)
             image_points = landmarks[[30, 8, 45, 36, 54, 48]]  # pick points corresponding to the model
             success, rotation_vec, translation_vec = \
-                cv2.solvePnP(model_points, image_points, camera_matrix, distance_coefficients)
+                cv2.solvePnP(model_points, image_points, camera_matrix, distortion_coefficients)
         elif self.method == "aruco":
             corners, ids, rejected = cv2.aruco.detectMarkers(image, self.arucodict, parameters=self.params)
             if len(corners) != 1:
                 raise ValueError("There must be exactly one marker in the image")  # TODO: support multiple markers
             rotation_vec, translation_vec, _objPoints = \
-                cv2.aruco.estimatePoseSingleMarkers(corners, .05, camera_matrix, distance_coefficients)
+                cv2.aruco.estimatePoseSingleMarkers(corners, .05, camera_matrix, distortion_coefficients)
         rotation_mat, _ = cv2.Rodrigues(rotation_vec)
         pose_mat = cv2.hconcat((rotation_mat, translation_vec))
         _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(pose_mat)
         angles[0, 0] = angles[0, 0] * -1
 
-        return angles[1, 0], angles[0, 0], angles[2, 0]  # roll, pitch, yaw
+        if return_matrices:
+            camera_matrix, distortion_coefficients, rotation_vec, translation_vec
+        else:
+            return angles[1, 0], angles[0, 0], angles[2, 0]  # azimuth, elevation, tilt
 
 
 class ResNet(nn.Module):
