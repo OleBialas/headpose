@@ -88,17 +88,21 @@ class PoseEstimator:
             image_points = landmarks[[30, 8, 45, 36, 54, 48]]  # pick points corresponding to the model
             success, rotation_vec, translation_vec = \
                 cv2.solvePnP(model_points, image_points, camera_matrix, distortion_coefficients)
+            rotation_mat, _ = cv2.Rodrigues(rotation_vec)
+            pose_mat = cv2.hconcat((rotation_mat, translation_vec))
+            _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(pose_mat)
+            angles[0, 0] = angles[0, 0] * -1
         elif self.method == "aruco":
             corners, ids, rejected = cv2.aruco.detectMarkers(image, self.arucodict, parameters=self.params)
             if len(corners) != 1:
                 raise ValueError("There must be exactly one marker in the image")  # TODO: support multiple markers
             rotation_vec, translation_vec, _objPoints = \
                 cv2.aruco.estimatePoseSingleMarkers(corners, .05, camera_matrix, distortion_coefficients)
-        rotation_mat, _ = cv2.Rodrigues(rotation_vec)
-        pose_mat = cv2.hconcat((rotation_mat, translation_vec))
-        _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(pose_mat)
-        angles[0, 0] = angles[0, 0] * -1
-
+            rotation_mat = - cv2.Rodrigues(rotation_vec)[0]
+            pose_mat = cv2.hconcat(rotation_mat, translation_vec.T)
+            _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(pose_mat)
+            angles[1, 0] = np.degrees(np.arcsin(np.sin(np.radians(angles[1, 0]))))
+            angles[0, 0] = angles[0, 0] * -1
         if return_matrices:
             return angles[1, 0], angles[0, 0], angles[2, 0], \
                    camera_matrix, distortion_coefficients, rotation_vec, translation_vec
