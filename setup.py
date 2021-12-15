@@ -25,6 +25,7 @@ setup(name='headpose',
                         'numpy',
                         'requests'],
       packages=find_packages(),
+      package_data={'headpose': ['haarcascade_frontalface_default.xml']},
       include_package_data=True,
       zip_safe=False)
 
