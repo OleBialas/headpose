@@ -1,5 +1,4 @@
 from pathlib import Path
-
 import cv2
 import numpy as np
 import torch
@@ -21,20 +20,14 @@ model_points = np.array([[0.0, 0.0, 0.0],  # Tip of the nose [30]
 
 
 class PoseEstimator:
-    def __init__(self, method):
+    def __init__(self, method, weights=None):
         self.method = method
         if method == "landmarks":
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             self.model = ResNet()
-            # TODO: check if the network is present, if not download it from the repo
-            try:
-                self.model.load_state_dict(torch.load(root / "model_weights.zip", map_location=device))
-            except FileNotFoundError:
-                import requests, zipfile, io
-                print("No model weights found, downloading from the repo ...")
-                r = requests.get("https://raw.githubusercontent.com/OleBialas/headpose/main/headpose/model_weights.zip")
-                z = zipfile.ZipFile(io.BytesIO(r.content))
-                z.extractall(root / "model_weights.zip")
+            if weights is None:  # use the pre-trained model from the repo
+                weights = get_model_weights()
+            self.model.load_state_dict(torch.load(weights, map_location=device))
             self.model.eval()
         elif method == "aruco":
             self.arucodict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_5X5_100)
@@ -123,3 +116,19 @@ class ResNet(nn.Module):
     def forward(self, x):
         x = self.model(x)
         return x
+
+
+def get_model_weights():
+    """
+    Return the path to the folder containing the weights of the pre-trained model or download them if necessary.
+    Returns:
+        (str): absolute path to the folder containing the face landmark dataset.
+    """
+    import requests
+    model_weights = root / "model_weights.zip"
+    if not model_weights.exists():
+        print("downloading model weights, this may take a while ...")
+        url='https://raw.githubusercontent.com/OleBialas/headpose/main/headpose/model_weights.zip'
+        r = requests.get("https://raw.githubusercontent.com/OleBialas/headpose/main/headpose/model_weights.zip")
+        with open(model_weights,'wb') as output_file:
+            output_file.write(r.content)
