@@ -1,6 +1,6 @@
 import pathlib
 import sys
-__version__ = '1.1.3'
+__version__ = '1.1.4'
 
 sys.path.append('..\\')
 from headpose.detect import PoseEstimator
