@@ -132,3 +132,4 @@ def get_model_weights():
         r = requests.get("https://raw.githubusercontent.com/OleBialas/headpose/main/headpose/model_weights.zip")
         with open(model_weights,'wb') as output_file:
             output_file.write(r.content)
+    return str(model_weights)
