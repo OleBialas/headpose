@@ -20,12 +20,11 @@ model_points = np.array([[0.0, 0.0, 0.0],  # Tip of the nose [30]
 
 class PoseEstimator:
     def __init__(self, weights=None):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    self.model = ResNet()
-    if weights is None:  # use the pre-trained model from the repo
-        weights = get_model_weights()
-        self.model.load_state_dict(torch.load(weights, map_location=device))
-        self.model.eval()
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = ResNet()
+        if weights is None:  # use the pre-trained model from the repo weights = get_model_weights()
+            self.model.load_state_dict(torch.load(weights, map_location=device))
+            self.model.eval()
 
     def detect_landmarks(self, image, plot=False):
         """
@@ -76,7 +75,6 @@ class PoseEstimator:
         _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(pose_mat)
         angles[0, 0] = angles[0, 0] * -1
         return angles[1, 0], angles[0, 0], angles[2, 0]  # azimuth, elevation, tilt
-
 
 class ResNet(nn.Module):
     def __init__(self, num_classes=136):
