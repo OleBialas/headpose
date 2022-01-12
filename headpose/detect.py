@@ -3,13 +3,10 @@ import cv2
 import numpy as np
 from PIL import Image
 from matplotlib import pyplot as plt
-try:
-   import torch
-   import torch.nn as nn
-   import torchvision.transforms.functional as TF
-   from torchvision import models
-except ModuleNotFoundError:
-    torch=False
+import torch
+import torch.nn as nn
+import torchvision.transforms.functional as TF
+from torchvision import models
 root = Path(__file__).parent
 face_cascade = cv2.CascadeClassifier(str(root / "haarcascade_frontalface_default.xml"))
 
@@ -22,23 +19,13 @@ model_points = np.array([[0.0, 0.0, 0.0],  # Tip of the nose [30]
 
 
 class PoseEstimator:
-    def __init__(self, method, weights=None):
-        self.method = method
-        if method == "landmarks":
-            if torch is False:
-                raise ImportError("Landmark estimation requires pytorch and torchvision!")
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            self.model = ResNet()
-            if weights is None:  # use the pre-trained model from the repo
-                weights = get_model_weights()
-            self.model.load_state_dict(torch.load(weights, map_location=device))
-            self.model.eval()
-        elif method == "aruco":
-            self.arucodict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_5X5_100)
-            self.params = cv2.aruco.DetectorParameters_create()
-            self.params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
-        else:
-            raise ValueError("Possible methods are 'landmarks' or 'aruco'!")
+    def __init__(self, weights=None):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    self.model = ResNet()
+    if weights is None:  # use the pre-trained model from the repo
+        weights = get_model_weights()
+        self.model.load_state_dict(torch.load(weights, map_location=device))
+        self.model.eval()
 
     def detect_landmarks(self, image, plot=False):
         """
@@ -80,31 +67,15 @@ class PoseEstimator:
                                   [0, focal_length, center[1]],
                                   [0, 0, 1]], dtype="double")
         distortion_coefficients = np.zeros((4, 1))  # Assuming no lens distortion
-        if self.method == "landmarks":
-            landmarks = self.detect_landmarks(image)
-            image_points = landmarks[[30, 8, 45, 36, 54, 48]]  # pick points corresponding to the model
-            success, rotation_vec, translation_vec = \
-                cv2.solvePnP(model_points, image_points, camera_matrix, distortion_coefficients)
-            rotation_mat, _ = cv2.Rodrigues(rotation_vec)
-            pose_mat = cv2.hconcat((rotation_mat, translation_vec))
-            _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(pose_mat)
-            angles[0, 0] = angles[0, 0] * -1
-        elif self.method == "aruco":
-            corners, ids, rejected = cv2.aruco.detectMarkers(image, self.arucodict, parameters=self.params)
-            if len(corners) != 1:
-                raise ValueError("There must be exactly one marker in the image")  # TODO: support multiple markers
-            rotation_vec, translation_vec, _objPoints = \
-                cv2.aruco.estimatePoseSingleMarkers(corners, .05, camera_matrix, distortion_coefficients)
-            rotation_mat = - cv2.Rodrigues(rotation_vec)[0]
-            pose_mat = cv2.hconcat(rotation_mat, translation_vec.T)
-            _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(pose_mat)
-            angles[1, 0] = np.degrees(np.arcsin(np.sin(np.radians(angles[1, 0]))))
-            angles[0, 0] = angles[0, 0] * -1
-        if return_matrices:
-            return angles[1, 0], angles[0, 0], angles[2, 0], \
-                   camera_matrix, distortion_coefficients, rotation_vec, translation_vec
-        else:
-            return angles[1, 0], angles[0, 0], angles[2, 0]  # azimuth, elevation, tilt
+        landmarks = self.detect_landmarks(image)
+        image_points = landmarks[[30, 8, 45, 36, 54, 48]]  # pick points corresponding to the model
+        success, rotation_vec, translation_vec = \
+            cv2.solvePnP(model_points, image_points, camera_matrix, distortion_coefficients)
+        rotation_mat, _ = cv2.Rodrigues(rotation_vec)
+        pose_mat = cv2.hconcat((rotation_mat, translation_vec))
+        _, _, _, _, _, _, angles = cv2.decomposeProjectionMatrix(pose_mat)
+        angles[0, 0] = angles[0, 0] * -1
+        return angles[1, 0], angles[0, 0], angles[2, 0]  # azimuth, elevation, tilt
 
 
 class ResNet(nn.Module):
