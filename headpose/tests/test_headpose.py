@@ -1,10 +1,9 @@
 from headpose.detect import PoseEstimator
 from pathlib import Path
 import cv2
-
+est = PoseEstimator()
 
 def test_landmark_detection():
-    est = PoseEstimator("landmarks")
     image_folder = Path(__file__).parent/"test_images"
     for image in image_folder.glob("pose*"):
         image = cv2.imread(str(image))
@@ -13,7 +12,6 @@ def test_landmark_detection():
 
 
 def test_pose_from_image():
-    est = PoseEstimator("landmarks")
     image_folder = Path(__file__).parent/"test_images"
     for image_left, image_right in zip(image_folder.glob("*left*"), image_folder.glob("*right*")):
         image_left = cv2.imread(str(image_left))

@@ -22,9 +22,10 @@ class PoseEstimator:
     def __init__(self, weights=None):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = ResNet()
-        if weights is None:  # use the pre-trained model from the repo weights = get_model_weights()
-            self.model.load_state_dict(torch.load(weights, map_location=device))
-            self.model.eval()
+        if weights is None:  # use the pre-trained model from the repo
+            weights = get_model_weights()
+        self.model.load_state_dict(torch.load(weights, map_location=device))
+        self.model.eval()
 
     def detect_landmarks(self, image, plot=False):
         """
