@@ -1,13 +1,15 @@
 from pathlib import Path
 import cv2
 import numpy as np
-import torch
-import torch.nn as nn
-import torchvision.transforms.functional as TF
 from PIL import Image
 from matplotlib import pyplot as plt
-from torchvision import models
-
+try:
+   import torch
+   import torch.nn as nn
+   import torchvision.transforms.functional as TF
+   from torchvision import models
+except ModuleNotFoundError:
+    torch=False
 root = Path(__file__).parent
 face_cascade = cv2.CascadeClassifier(str(root / "haarcascade_frontalface_default.xml"))
 
@@ -23,6 +25,8 @@ class PoseEstimator:
     def __init__(self, method, weights=None):
         self.method = method
         if method == "landmarks":
+            if torch is False:
+                raise ImportError("Landmark estimation requires pytorch and torchvision!")
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             self.model = ResNet()
             if weights is None:  # use the pre-trained model from the repo
